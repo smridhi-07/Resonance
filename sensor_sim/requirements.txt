@@ -1,17 +1,10 @@
-# ==============================================================================
-# Resonance Sensor Simulator & Machine Learning Dependencies
-# ==============================================================================
-
-# Core Numerical & Data Processing
-numpy>=2.0.0
-pandas>=2.2.0
-scipy>=1.14.0
-scikit-learn>=1.5.0
-
-# HTTP Telemetry Transport
+numpy>=1.26.0
+pandas>=2.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
 requests>=2.31.0
-
-# Contract Validation & Testing
+joblib>=1.3.0
+openpyxl>=3.1.0
 jsonschema>=4.20.0
 rfc3339-validator>=0.1.4
 pytest>=8.0.0
