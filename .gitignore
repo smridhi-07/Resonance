@@ -34,6 +34,8 @@ data/*
 !data/.gitkeep
 models/*
 !models/.gitkeep
+z24_data/
+
 
 # Environment and Secret Files
 .env
