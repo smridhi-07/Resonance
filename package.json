@@ -1,0 +1,23 @@
+{
+  "name": "resonance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Acoustic and vibration anomaly-monitoring prototype for infrastructure health",
+  "type": "module",
+  "scripts": {
+    "test:contract": "python -m pytest tests/contract -v",
+    "validate:examples": "python -c \"import json, jsonschema; s=json.load(open('contracts/sensor-event.schema.json', encoding='utf-8')); v=jsonschema.Draft202012Validator(s, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER); [v.validate(json.load(open(f, encoding='utf-8'))) for f in ['contracts/examples/normal-event.json', 'contracts/examples/anomaly-event.json']]; print('Authoritative contract examples valid!')\"",
+    "client:dev": "npm --prefix client run dev",
+    "server:dev": "npm --prefix server run dev",
+    "sensor:run": "python -m sensor_sim"
+  },
+  "keywords": [
+    "structural-monitoring",
+    "vibration-analysis",
+    "anomaly-detection",
+    "digital-twin",
+    "iot-simulation"
+  ],
+  "author": "Resonance Team",
+  "license": "UNLICENSED"
+}

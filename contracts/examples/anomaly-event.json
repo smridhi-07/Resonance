@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "event_id": "evt_000002",
+  "sensor_id": "Pillar_A",
+  "timestamp": "2026-10-24T14:30:01.000Z",
+  "sequence": 2,
+  "status": "anomaly",
+  "anomaly_score": 0.87,
+  "features": {
+    "rms": 0.182,
+    "std_dev": 0.115,
+    "dominant_frequency_hz": 42.3
+  },
+  "source": "simulation"
+}
