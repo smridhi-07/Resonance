@@ -73,19 +73,58 @@ Returned when the body does not strictly satisfy `sensor-event.schema.json` (e.g
 }
 ```
 
+#### 409 Conflict — Duplicate Event ID or Sequence Ordering Violation
+Returned when an event ID has already been accepted or the sequence number does not strictly advance the sensor stream.
+
+```json
+{
+  "error": "Conflict",
+  "message": "Duplicate event_id \"evt_000001\" rejected. Each event_id must be unique across all streams."
+}
+```
+
+#### 413 Payload Too Large — Request Exceeds Size Limit
+Returned when the incoming request body exceeds the configured maximum size (default: `50kb`).
+
+```json
+{
+  "error": "Payload Too Large",
+  "message": "Request body exceeds configured maximum limit of 50kb"
+}
+```
+
 #### 500 Internal Server Error — Gateway Exception
-Returned if the backend encounters an unhandled runtime error during processing.
+Returned if the backend encounters an unhandled runtime error during processing. Stack traces and internal implementation details are withheld from the response.
 
 ```json
 {
   "error": "Internal Server Error",
-  "message": "An unexpected error occurred while processing sensor telemetry."
+  "message": "An unexpected internal error occurred while processing the request"
 }
 ```
 
 ---
 
-## 2. Real-Time Distribution: Node.js to React (Socket.IO)
+## 2. Gateway Service Health Interface
+
+### Endpoint Details
+- **Method:** `GET`
+- **Paths:** `/health`, `/api/health`
+- **Status:** `200 OK`
+- **Response Format:**
+```json
+{
+  "status": "healthy",
+  "service": "resonance-gateway",
+  "timestamp": "2026-10-24T14:35:00.000Z",
+  "uptime_seconds": 12.4,
+  "active_socket_clients": 0
+}
+```
+
+---
+
+## 3. Real-Time Distribution: Node.js to React (Socket.IO)
 
 The backend gateway acts as a real-time event broadcaster for connected client dashboards.
 

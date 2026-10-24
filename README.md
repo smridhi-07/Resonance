@@ -3,6 +3,7 @@
 > **Real-Time Acoustic & Vibration Anomaly-Monitoring Prototype for Aging Civil Infrastructure**
 
 [![Contract Tests](https://img.shields.io/badge/Contract%20Tests-61%2F61%20Passing-brightgreen)](#contract-testing--validation)
+[![Backend Gateway Tests](https://img.shields.io/badge/Backend%20Tests-18%2F18%20Passing-brightgreen)](#running-the-backend-gateway)
 [![JSON Schema](https://img.shields.io/badge/Schema-Draft%202020--12-blue)](contracts/sensor-event.schema.json)
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo-orange)](docs/ARCHITECTURE.md)
 
@@ -138,10 +139,33 @@ The test suite validates:
 
 ---
 
-## 6. Developer Handoff & Documentation
+## 6. Running the Backend Gateway
+
+The backend gateway (`server/`) is implemented in **Node.js**, **Express**, **TypeScript**, and **Socket.IO**:
+
+```bash
+# Install backend dependencies
+npm --prefix server install
+
+# Run backend in development mode (live reload on http://localhost:4000)
+npm run server:dev
+
+# Run backend integration tests (Vitest: 18 tests)
+npm run server:test
+
+# Run TypeScript type check
+npm run server:typecheck
+```
+
+For full API endpoint specifications and cURL examples, see [server/README.md](server/README.md) and [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
+
+---
+
+## 7. Developer Handoff & Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System components, ports, and boundaries
-- [docs/API_CONTRACT.md](docs/API_CONTRACT.md) — HTTP ingest and Socket.IO real-time channels
+- [docs/API_CONTRACT.md](docs/API_CONTRACT.md) — HTTP ingest, health check, and Socket.IO real-time channels
 - [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) — Safe sequential collaboration procedures
-- [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md) — Detailed instructions for implementing the backend in Phase 2
+- [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md) — Phase 2 implementation context and specifications
+- [server/README.md](server/README.md) — Backend gateway architecture, responses, and verification
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Coding conventions and commit guidelines
