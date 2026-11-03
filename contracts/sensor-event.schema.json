@@ -84,6 +84,34 @@
       "type": "string",
       "enum": ["simulation", "hardware"],
       "description": "Data provenance tag indicating whether telemetry originates from synthetic/dataset replay simulation or physical microcontroller hardware."
+    },
+    "raw_samples": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Optional raw windowed vibration waveform samples acquired during the observation window."
+    },
+    "fft_spectrum": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["frequency", "magnitude"],
+        "additionalProperties": false,
+        "properties": {
+          "frequency": {
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Frequency bin center in Hertz (Hz)."
+          },
+          "magnitude": {
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Normalized FFT spectral magnitude at this frequency bin."
+          }
+        }
+      },
+      "description": "Optional Fast Fourier Transform (FFT) frequency spectrum computed directly from raw window samples via scipy.fft.rfft."
     }
   }
 }
