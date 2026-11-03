@@ -4,6 +4,7 @@ import { SchemaValidator } from './validator.js';
 import { TelemetryStateManager } from './telemetryState.js';
 import { SocketHub } from './socketHub.js';
 import { createApp } from './app.js';
+import type { RouteDependencies } from './routes.js';
 
 export async function bootstrap() {
   const startTime = Date.now();
@@ -20,25 +21,26 @@ export async function bootstrap() {
   // Initialize runtime telemetry state
   const stateManager = new TelemetryStateManager();
 
-  // Create HTTP server
-  const server = http.createServer();
-
-  // Initialize Socket.IO hub attached to the HTTP server
-  const socketHub = new SocketHub(server, config.clientOrigin);
+  // Route dependencies container with deferred socketHub reference
+  let socketHubInstance: SocketHub | undefined;
+  const deps: RouteDependencies = {
+    validator,
+    stateManager,
+    get socketHub() {
+      return socketHubInstance;
+    },
+    startTime,
+  };
 
   // Create Express application
-  const app = createApp(
-    {
-      validator,
-      stateManager,
-      socketHub,
-      startTime,
-    },
-    config
-  );
+  const app = createApp(deps, config);
 
-  // Attach Express app to HTTP server
-  server.on('request', app);
+  // Create HTTP server with Express app handler
+  const server = http.createServer(app);
+
+  // Attach Socket.IO hub to the HTTP server (Engine.IO properly wraps existing app listener)
+  const socketHub = new SocketHub(server, config.clientOrigin);
+  socketHubInstance = socketHub;
 
   // Start listening
   server.listen(config.port, () => {

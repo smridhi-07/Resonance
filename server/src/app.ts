@@ -54,8 +54,11 @@ export function createApp(
   // Mount routes
   app.use(createRouter(deps));
 
-  // 404 Handler
-  app.use((_req: Request, res: Response) => {
+  // 404 Handler - explicitly bypass /socket.io polling requests handled by Engine.IO
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/socket.io')) {
+      return next();
+    }
     res.status(404).json({
       error: 'Not Found',
       message: 'The requested resource was not found on this server',

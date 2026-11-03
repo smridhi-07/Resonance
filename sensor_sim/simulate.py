@@ -35,7 +35,8 @@ except ImportError:
 # Configuration & Constants
 # ------------------------------------------------------------------------------
 GATEWAY_URL = os.getenv("INGEST_URL", "http://localhost:4000/api/sensor-data")
-SENSOR_ID = os.getenv("SENSOR_ID", "Pillar_A")
+SENSOR_ID = os.getenv("SENSOR_ID", "ALL")
+PILLARS = ["Pillar_A", "Pillar_B", "Pillar_C", "Pillar_D"]
 SAMPLING_RATE_HZ = 100.0       # 100 Hz acquisition rate
 WINDOW_SAMPLES = 200           # 2.0 second observation window (200 samples)
 LOOP_INTERVAL_SEC = 1.5        # Microcontroller sleep interval between readings
@@ -194,6 +195,8 @@ def build_sensor_payload(
     rms: float,
     std_dev: float,
     dom_freq: float,
+    raw_samples: Optional[list] = None,
+    fft_spectrum: Optional[list] = None,
 ) -> Dict[str, Any]:
     """
     Constructs a telemetry payload conforming strictly to contracts/sensor-event.schema.json:
@@ -206,6 +209,8 @@ def build_sensor_payload(
       - anomaly_score: non-negative continuous severity float
       - features: rms, std_dev, dominant_frequency_hz
       - source: "simulation"
+      - raw_samples (optional): raw vibration window samples
+      - fft_spectrum (optional): actual FFT frequency and magnitude array
     """
     now_utc = datetime.now(timezone.utc)
     # Strictly RFC 3339 / ISO 8601 with trailing 'Z' timezone designator
@@ -226,6 +231,11 @@ def build_sensor_payload(
         },
         "source": "simulation",
     }
+
+    if raw_samples is not None:
+        payload["raw_samples"] = raw_samples
+    if fft_spectrum is not None:
+        payload["fft_spectrum"] = fft_spectrum
 
     return payload
 
@@ -266,10 +276,11 @@ def run_live_simulator(
 
     print("\nStarting live edge telemetry broadcast... Press Ctrl+C to terminate.", flush=True)
     print("-" * 80, flush=True)
-    print(f"{'Seq':<7} | {'Event Nature':<17} | {'Pred':<7} | {'Score':<7} | {'RMS (m/s²)':<10} | {'Peak Freq':<10} | {'HTTP Gateway Status'}", flush=True)
-    print("-" * 80, flush=True)
+    print(f"{'Global':<7} | {'Sensor':<10} | {'Seq':<5} | {'Nature':<16} | {'Pred':<7} | {'Score':<7} | {'RMS (m/s²)':<10} | {'Peak Freq':<10} | {'Gateway Status'}", flush=True)
+    print("-" * 95, flush=True)
 
     sequence = 1
+    sensor_sequences: Dict[str, int] = {p: 0 for p in PILLARS}
     session = requests.Session()
     headers = {
         "Content-Type": "application/json",
@@ -278,6 +289,15 @@ def run_live_simulator(
 
     try:
         while True:
+            # Determine target sensor for this tick
+            if sensor_id == "ALL":
+                target_sensor = PILLARS[(sequence - 1) % len(PILLARS)]
+            else:
+                target_sensor = sensor_id
+
+            sensor_sequences[target_sensor] = sensor_sequences.get(target_sensor, 0) + 1
+            curr_sensor_seq = sensor_sequences[target_sensor]
+
             # 1. Decide event nature: 80% Normal baseline vs. 20% Injected Anomaly
             is_anomaly = random.random() < ANOMALY_PROBABILITY
             event_nature = "INJECTED ANOMALY" if is_anomaly else "Normal"
@@ -287,6 +307,22 @@ def run_live_simulator(
 
             # 3. Extract the exact 3 contract features
             rms, std_dev, dom_freq = extract_contract_features(waveform, fs=SAMPLING_RATE_HZ)
+
+            # Compute actual FFT spectrum using scipy.fft.rfft
+            fft_magnitudes = np.abs(rfft(waveform))
+            freq_bins = rfftfreq(len(waveform), d=1.0 / SAMPLING_RATE_HZ)
+            norm_magnitudes = fft_magnitudes * (2.0 / len(waveform))
+            if len(norm_magnitudes) > 0:
+                norm_magnitudes[0] = fft_magnitudes[0] / len(waveform)
+
+            # Build FFT spectrum array (bins from 0 to 50 Hz, step 0.5 Hz)
+            fft_spectrum = [
+                {"frequency": round(float(f), 1), "magnitude": round(float(m), 4)}
+                for f, m in zip(freq_bins, norm_magnitudes)
+            ]
+
+            # Raw samples array from actual window (rounded floats)
+            raw_samples = [round(float(s), 4) for s in waveform.tolist()]
 
             # 4. Inference via IsolationForest
             feature_vector = np.array([[rms, std_dev, dom_freq]], dtype=np.float64)
@@ -299,23 +335,27 @@ def run_live_simulator(
             # Non-negative continuous score: nominal baseline is 0.0; deviation produces positive scores
             anomaly_score = max(0.0, float(-decision_val))
 
-            # 5. Build strict JSON payload
+            # 5. Build strict JSON payload with actual waveform samples and FFT spectrum
             payload = build_sensor_payload(
-                sequence=sequence,
-                sensor_id=sensor_id,
+                sequence=curr_sensor_seq,
+                sensor_id=target_sensor,
                 status=status,
                 anomaly_score=anomaly_score,
                 rms=rms,
                 std_dev=std_dev,
                 dom_freq=dom_freq,
+                raw_samples=raw_samples,
+                fft_spectrum=fft_spectrum,
             )
+            # Ensure unique event_id across all events and restart runs
+            payload["event_id"] = f"evt_{int(time.time() * 1000) % 10000000:07d}_{sequence:04d}"
 
             # 6. Contract validation gatekeeper
             if schema and HAS_JSONSCHEMA:
                 try:
                     jsonschema.validate(instance=payload, schema=schema)
                 except jsonschema.ValidationError as val_err:
-                    print(f"\n[FATAL CONTRACT ERROR] Payload sequence #{sequence} violates schema:", flush=True)
+                    print(f"\n[FATAL CONTRACT ERROR] Payload #{sequence} ({target_sensor} seq #{curr_sensor_seq}) violates schema:", flush=True)
                     print(f"  Field: {list(val_err.path)}", flush=True)
                     print(f"  Error: {val_err.message}", flush=True)
                     sys.exit(1)
@@ -326,6 +366,16 @@ def run_live_simulator(
                 response = session.post(endpoint, json=payload, headers=headers, timeout=2.0)
                 if response.status_code in (200, 202):
                     http_status_str = f"{response.status_code} Accepted"
+                elif response.status_code == 409:
+                    http_status_str = f"{response.status_code} Conflict (Syncing sequence)"
+                    try:
+                        err_data = response.json()
+                        msg = err_data.get("message", "")
+                        if "last accepted sequence (" in msg:
+                            last_seq = int(msg.split("last accepted sequence (")[1].split(")")[0])
+                            sensor_sequences[target_sensor] = last_seq
+                    except Exception:
+                        pass
                 else:
                     http_status_str = f"{response.status_code} {response.reason}"
             except requests.exceptions.ConnectionError:
@@ -336,16 +386,17 @@ def run_live_simulator(
                 http_status_str = f"[Error: {ex}]"
 
             # 8. Clean formatted console logging
-            nature_styled = f"\033[91m{event_nature:<17}\033[0m" if is_anomaly else f"\033[92m{event_nature:<17}\033[0m"
+            nature_styled = f"\033[91m{event_nature:<16}\033[0m" if is_anomaly else f"\033[92m{event_nature:<16}\033[0m"
             pred_styled = f"\033[91m{status:<7}\033[0m" if status == "anomaly" else f"\033[92m{status:<7}\033[0m"
 
-            # If terminal doesn't support ANSI codes cleanly, fallback to standard text
             if not sys.stdout.isatty():
-                nature_styled = f"{event_nature:<17}"
+                nature_styled = f"{event_nature:<16}"
                 pred_styled = f"{status:<7}"
 
             print(
                 f"#{sequence:<6} | "
+                f"{target_sensor:<10} | "
+                f"#{curr_sensor_seq:<4} | "
                 f"{nature_styled} | "
                 f"{pred_styled} | "
                 f"{anomaly_score:<7.4f} | "

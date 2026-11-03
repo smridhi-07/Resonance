@@ -9,6 +9,11 @@ export interface SensorFeatures {
   dominant_frequency_hz: number;
 }
 
+export interface FftSpectrumPoint {
+  frequency: number;
+  magnitude: number;
+}
+
 export interface ResonanceSensorEvent {
   schema_version: '1.0';
   event_id: string;
@@ -19,6 +24,8 @@ export interface ResonanceSensorEvent {
   anomaly_score: number;
   features: SensorFeatures;
   source: 'simulation' | 'hardware';
+  raw_samples?: number[];
+  fft_spectrum?: FftSpectrumPoint[];
 }
 
 export interface ServerConfig {
